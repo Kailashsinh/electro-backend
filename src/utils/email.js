@@ -1,24 +1,18 @@
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 
-const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-    },
-});
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 const sendEmail = async (to, subject, html) => {
     try {
-        const info = await transporter.sendMail({
-            from: '"ElectroCare" <kailashsinhrajput25@gmail.com>', // sender address
-            to, // list of receivers
-            subject, // Subject line
-            html, // html body
+        const data = await resend.emails.send({
+            from: 'ElectroCare <onboarding@resend.dev>', // Use default testing domain
+            to: [to], // In free tier, can only send to the email you signed up with
+            subject: subject,
+            html: html,
         });
 
-        console.log("Message sent: %s", info.messageId);
-        return info;
+        console.log("Email sent successfully:", data);
+        return data;
     } catch (error) {
         console.error("Error sending email:", error);
         throw error;
