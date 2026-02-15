@@ -31,14 +31,6 @@ app.get('/api/health', (req, res) => {
   res.send('ElectroCare API is running');
 });
 
-/* -------------------- Serve Frontend -------------------- */
-// Serve static files from the React frontend app
-const frontendPath = path.join(__dirname, '../../frontend/dist');
-app.use(express.static(frontendPath));
 
-// AFTER all API routes, match any other route to serve the React app (SPA)
-app.get('*', (req, res) => {
-  res.sendFile(path.join(frontendPath, 'index.html'));
-});
 
 module.exports = app;
