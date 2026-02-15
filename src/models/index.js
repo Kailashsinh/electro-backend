@@ -1,0 +1,18 @@
+module.exports = {
+  Admin: require('./Admin'),
+  User: require('./User'),
+  Technician: require('./Technician'),
+  Appliance: require('./Appliance'),
+  Category: require('./Category'),
+  Brand: require('./Brand'),
+  Model: require('./Model'),
+  Product: require('./Product'),
+  Subscription: require('./Subscription'),
+  ServiceRequest: require('./ServiceRequest'),
+  RequestQueue: require('./RequestQueue'),
+  Payment: require('./Payment'),
+  TechnicianPayment: require('./TechnicianPayment'),
+  Feedback: require('./Feedback'),
+  Notification: require('./Notification'),
+  Transaction: require('./Transaction'),
+};  

@@ -1,0 +1,16 @@
+﻿[dotenv@17.2.3] injecting env (4) from .env -- tip: ΓÜÖ∩╕Å  write to custom object with { processEnv: myObject }
+≡ƒÜÇ Starting System Verification...
+Γ£à Connected to MongoDB
+
+--- 1. Creating Entities ---
+Γ£à User created. Wallet: 1000
+Γ£à Tech created. Wallet: 0
+
+--- 2. Subscription Flow ---
+Γ£à Paid 249 for Premium. New Wallet: 751
+
+--- 3. Refund Flow (Cancel Before OnWay) ---
+Γ£à Service Request Created (Pending). Wallet deducted 200.
+Γ£à Cancelled. Wallet Refunded. New Wallet: 751
+
+--- 4. Refund Flow (Cancel After Estimate) ---
