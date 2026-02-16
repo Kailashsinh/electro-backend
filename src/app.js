@@ -8,7 +8,10 @@ const applianceRoutes = require('./routes/appliance.routes');
 const feedbackRoutes = require('./routes/feedback.routes');
 
 /* -------------------- Middlewares -------------------- */
-app.use(cors());
+app.use(cors({
+  origin: ['http://localhost:5173', 'https://electro-cares.vercel.app'],
+  credentials: true
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
