@@ -4,7 +4,16 @@ const RequestQueue = require('../models/RequestQueue');
 const { findNearestTechnicians } = require('../utils/geo');
 
 exports.createServiceUsingSubscription = async (req, res) => {
-  const { appliance_id, issue_desc, preferred_slot, scheduled_date, latitude, longitude, address_details } = req.body;
+  let { appliance_id, issue_desc, preferred_slot, scheduled_date, latitude, longitude, address_details } = req.body;
+
+  // Parse address_details if it's a string
+  if (typeof address_details === 'string') {
+    try {
+      address_details = JSON.parse(address_details);
+    } catch (e) {
+      console.error("Failed to parse address_details:", e);
+    }
+  }
 
   const subscription = await Subscription.findOne({
     user_id: req.user.id,
@@ -46,21 +55,28 @@ exports.createServiceUsingSubscription = async (req, res) => {
 
 
   let technicians = [];
-  // Pass pincode to geo search
-  technicians = await findNearestTechnicians(latitude, longitude, address_details?.pincode);
+  // Convert to numbers
+  const latNum = parseFloat(latitude);
+  const lngNum = parseFloat(longitude);
 
+  // Pass pincode to geo search
+  technicians = await findNearestTechnicians(latNum, lngNum, address_details?.pincode);
+
+
+  const issueImages = (req.files && Array.isArray(req.files)) ? req.files.map(file => file.path) : [];
 
   const serviceRequest = await ServiceRequest.create({
     user_id: req.user.id,
     appliance_id,
     issue_desc,
+    issue_images: issueImages,
     preferred_slot,
     scheduled_date: scheduled_date || new Date(),
     visit_fee_paid: true,
     status: 'broadcasted',
     broadcasted_to: technicians.map((t) => t._id),
-    location: (latitude && longitude && latitude !== 0 && longitude !== 0) ? { coordinates: [parseFloat(longitude), parseFloat(latitude)] } : undefined,
-    address_details: address_details // Save manual address
+    location: (latNum && lngNum && latNum !== 0 && lngNum !== 0) ? { type: 'Point', coordinates: [lngNum, latNum] } : undefined,
+    address_details: address_details // Save manual address (now object)
   });
 
   if (technicians.length > 0) {

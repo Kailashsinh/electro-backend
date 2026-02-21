@@ -16,5 +16,6 @@ router.post(
 );
 
 router.get('/profile', authMiddleware('technician'), technicianController.getProfile);
+router.patch('/location', authMiddleware('technician'), technicianController.updateLocation);
 
 module.exports = router;

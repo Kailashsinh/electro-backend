@@ -1,7 +1,9 @@
 const nodemailer = require('nodemailer');
 
 const transporter = nodemailer.createTransport({
-    service: 'gmail',
+    host: process.env.EMAIL_HOST,
+    port: Number(process.env.EMAIL_PORT),
+    secure: false, // 587 is STARTTLS
     auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS,
@@ -10,17 +12,25 @@ const transporter = nodemailer.createTransport({
 
 const sendEmail = async (to, subject, html) => {
     try {
+        const fromEmail = process.env.EMAIL_FROM || 'kailashsinhrajput25@gmail.com';
         const info = await transporter.sendMail({
-            from: `"ElectroCare" <${process.env.EMAIL_USER}>`, // Use env var for sender
-            to, // list of receivers
-            subject, // Subject line
-            html, // html body
+            from: `"ElectroCare" <${fromEmail}>`,
+            to,
+            subject,
+            html,
         });
 
-        console.log("Message sent: %s", info.messageId);
+        console.log("Email sent successfully:");
+        console.log("Message ID:", info.messageId);
+        console.log("Response:", info.response);
         return info;
     } catch (error) {
-        console.error("Error sending email:", error);
+        console.error("CRITICAL ERROR: Failed to send email via Brevo:");
+        console.error("Error Code:", error.code);
+        console.error("Error Message:", error.message);
+        if (error.response) {
+            console.error("SMTP Response:", error.response);
+        }
         throw error;
     }
 };

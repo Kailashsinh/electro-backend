@@ -52,6 +52,7 @@ const ServiceRequestSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    issue_images: [{ type: String }],
 
     preferred_slot: {
       type: String,

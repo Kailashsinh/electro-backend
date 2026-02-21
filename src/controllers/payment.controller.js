@@ -6,7 +6,7 @@ const { findNearestTechnicians } = require('../utils/geo');
 
 exports.payVisitFee = async (req, res) => {
   try {
-    const {
+    let {
       appliance_id,
       issue_desc,
       preferred_slot,
@@ -15,6 +15,15 @@ exports.payVisitFee = async (req, res) => {
       longitude,
       address_details
     } = req.body;
+
+    // Parse address_details if it's a string (FormData sends everything as string)
+    if (typeof address_details === 'string') {
+      try {
+        address_details = JSON.parse(address_details);
+      } catch (e) {
+        console.error("Failed to parse address_details:", e);
+      }
+    }
 
     // Check for active subscription
     const subscription = await Subscription.findOne({
@@ -55,13 +64,20 @@ exports.payVisitFee = async (req, res) => {
     }
 
     let technicians = [];
+    // Convert to numbers explicitly
+    const latNum = parseFloat(latitude);
+    const lngNum = parseFloat(longitude);
+
     // Pass pincode to geo search
-    technicians = await findNearestTechnicians(latitude, longitude, address_details?.pincode);
+    technicians = await findNearestTechnicians(latNum, lngNum, address_details?.pincode);
+
+    const issueImages = (req.files && Array.isArray(req.files)) ? req.files.map(file => file.path) : [];
 
     const serviceRequest = await ServiceRequest.create({
       user_id: req.user.id,
       appliance_id,
       issue_desc,
+      issue_images: issueImages,
       preferred_slot,
       visit_fee_paid,
       used_free_visit: allowFreeVisit,
@@ -70,9 +86,8 @@ exports.payVisitFee = async (req, res) => {
       subscription_plan: plan,
       priority_level,
       scheduled_date: req.body.scheduled_date || new Date(),
-      preferred_slot: req.body.preferred_slot,
-      location: (latitude && longitude && latitude !== 0 && longitude !== 0) ? { coordinates: [parseFloat(longitude), parseFloat(latitude)] } : undefined,
-      address_details: address_details // Save manual address
+      location: (latNum && lngNum && latNum !== 0 && lngNum !== 0) ? { type: 'Point', coordinates: [lngNum, latNum] } : undefined,
+      address_details: address_details // Save manual address (now object)
     });
 
 

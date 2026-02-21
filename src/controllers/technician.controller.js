@@ -67,3 +67,24 @@ exports.getProfile = async (req, res) => {
   }
 };
 
+exports.updateLocation = async (req, res) => {
+  try {
+    const { latitude, longitude } = req.body;
+    if (!latitude || !longitude) {
+      return res.status(400).json({ message: 'Latitude and longitude are required.' });
+    }
+
+    await Technician.findByIdAndUpdate(req.user.id, {
+      location: {
+        type: 'Point',
+        coordinates: [longitude, latitude] // MongoDB uses [lng, lat]
+      }
+    });
+
+    res.json({ message: 'Location updated successfully' });
+  } catch (error) {
+    console.error('Error updating location:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
