@@ -4,6 +4,7 @@ const TechnicianSchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true },
   phone: { type: String, required: true, trim: true },
   email: { type: String, unique: true, sparse: true, trim: true, lowercase: true },
+  pincode: { type: String, trim: true }, // For manual address matching
   profile_picture: {
     type: String,
     default: "",
@@ -30,6 +31,10 @@ const TechnicianSchema = new mongoose.Schema({
     type: Number,
     default: 0,
   },
+  completed_jobs: {
+    type: Number,
+    default: 0,
+  },
   location: {
     type: {
       type: String,
@@ -46,7 +51,22 @@ const TechnicianSchema = new mongoose.Schema({
     type: Boolean,
     default: true,
   },
-  isVerified: { type: Boolean, default: false },
+  isVerified: { type: Boolean, default: false }, // Email Verification
+
+  aadhaar_number: { type: String, unique: true, sparse: true, trim: true }, // Unique & Required for verification
+
+  // Background Check Fields
+  verificationStatus: {
+    type: String,
+    enum: ['pending', 'submitted', 'approved', 'rejected'],
+    default: 'pending' // 'pending' = initial, 'submitted' = docs uploaded
+  },
+  documents: {
+    id_proof: { type: String, default: "" }, // Aadhaar Card Image
+    live_photo: { type: String, default: "" }, // Webcam Capture
+    certification: { type: String, default: "" }, // Certification Image
+    rejection_reason: { type: String, default: "" }
+  },
 }, { timestamps: true });
 
 TechnicianSchema.index({ location: '2dsphere' });

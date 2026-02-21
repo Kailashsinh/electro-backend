@@ -36,8 +36,15 @@ const ServiceRequestSchema = new mongoose.Schema(
       },
       coordinates: {
         type: [Number], // [lng, lat]
-        required: false, // Optional for now, but recommended
+        required: false,
       },
+    },
+
+    address_details: {
+      street: String,
+      city: String,
+      pincode: String,
+      manual: { type: Boolean, default: false }
     },
 
     /* ---------------- SERVICE INFO ---------------- */
@@ -125,6 +132,12 @@ const ServiceRequestSchema = new mongoose.Schema(
     priority_level: {
       type: Number,
       default: 1, // basic
+    },
+
+    /* ---------------- FREE VISIT TRACKING ---------------- */
+    used_free_visit: {
+      type: Boolean,
+      default: false,
     },
 
     /* ---------------- TIMESTAMPS ---------------- */

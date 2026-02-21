@@ -4,7 +4,7 @@ const RequestQueue = require('../models/RequestQueue');
 const { findNearestTechnicians } = require('../utils/geo');
 
 exports.createServiceUsingSubscription = async (req, res) => {
-  const { appliance_id, issue_desc, preferred_slot, scheduled_date, latitude, longitude } = req.body;
+  const { appliance_id, issue_desc, preferred_slot, scheduled_date, latitude, longitude, address_details } = req.body;
 
   const subscription = await Subscription.findOne({
     user_id: req.user.id,
@@ -19,7 +19,7 @@ exports.createServiceUsingSubscription = async (req, res) => {
 
   let isFreeVisit = false;
 
-  
+
   if (subscription.plan === 'premium') {
     if (subscription.free_visits_used < 2) {
       isFreeVisit = true;
@@ -27,7 +27,7 @@ exports.createServiceUsingSubscription = async (req, res) => {
     }
   }
 
-  
+
   if (subscription.plan === 'premium_pro') {
     if ((subscription.total_visits_used + 1) % 3 === 0) {
       isFreeVisit = true;
@@ -44,13 +44,11 @@ exports.createServiceUsingSubscription = async (req, res) => {
     });
   }
 
-  
-  let technicians = [];
-  if (latitude && longitude) {
-    technicians = await findNearestTechnicians(latitude, longitude);
-  }
 
-  
+  let technicians = [];
+  // Pass pincode to geo search
+  technicians = await findNearestTechnicians(latitude, longitude, address_details?.pincode);
+
 
   const serviceRequest = await ServiceRequest.create({
     user_id: req.user.id,
@@ -61,7 +59,8 @@ exports.createServiceUsingSubscription = async (req, res) => {
     visit_fee_paid: true,
     status: 'broadcasted',
     broadcasted_to: technicians.map((t) => t._id),
-    location: (latitude && longitude) ? { coordinates: [parseFloat(longitude), parseFloat(latitude)] } : undefined,
+    location: (latitude && longitude && latitude !== 0 && longitude !== 0) ? { coordinates: [parseFloat(longitude), parseFloat(latitude)] } : undefined,
+    address_details: address_details // Save manual address
   });
 
   if (technicians.length > 0) {

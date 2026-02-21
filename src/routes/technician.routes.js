@@ -1,63 +1,20 @@
 const express = require('express');
 const router = express.Router();
-
-const authMiddleware = require('../middlewares/auth.middleware');
 const technicianController = require('../controllers/technician.controller');
-
-/**
- * Protected route - Technician profile
- */
-router.get(
-  '/profile',
-  authMiddleware('technician'),
-  technicianController.getProfile
-);
-
-/**
- * Protected route - Update Technician profile
- */
-router.put(
-  '/profile',
-  authMiddleware('technician'),
-  technicianController.updateProfile
-);
-
-/**
- * Technician dashboard
- */
-router.get(
-  '/requests/available',
-  authMiddleware('technician'),
-  technicianController.getAvailableRequests
-);
-
-router.get(
-  '/requests/my',
-  authMiddleware('technician'),
-  technicianController.getTechnicianJobs
-);
-
-
-/**
- * Technician updates service status
- */
-router.patch(
-  '/requests/:request_id/status',
-  authMiddleware('technician'),
-  technicianController.updateServiceStatus
-);
-
-/**
- * Technician accepts request
- */
+const upload = require('../middlewares/upload.middleware');
+const authMiddleware = require('../middlewares/auth.middleware');
 
 router.post(
-  '/requests/:request_id/accept',
+  '/upload-documents',
   authMiddleware('technician'),
-  technicianController.acceptServiceRequest
+  upload.fields([
+    { name: 'id_proof', maxCount: 1 },
+    { name: 'live_photo', maxCount: 1 },
+    { name: 'certification', maxCount: 1 }
+  ]),
+  technicianController.uploadVerificationDocuments
 );
 
-console.log('Technician routes loaded');
-
+router.get('/profile', authMiddleware('technician'), technicianController.getProfile);
 
 module.exports = router;

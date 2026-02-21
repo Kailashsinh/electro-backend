@@ -1,191 +1,69 @@
-const { Technician } = require('../models');
+const Technician = require('../models/Technician');
 
-
-const ServiceRequest = require('../models/ServiceRequest');
-
-
-exports.getAvailableRequests = async (req, res) => {
+exports.uploadVerificationDocuments = async (req, res) => {
   try {
-    const requests = await ServiceRequest.find({
-      status: 'broadcasted',
-      technician_id: null,
-      broadcasted_to: req.user.id,
-    })
-      .populate({
-        path: 'appliance_id',
-        populate: {
-          path: 'model',
-          populate: {
-            path: 'brand_id',
-            populate: {
-              path: 'category_id',
-            },
-          },
-        },
-      })
-      .sort({ created_at: -1 });
-
-    res.json(requests);
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-};
-
-
-exports.getTechnicianJobs = async (req, res) => {
-  try {
-    const requests = await ServiceRequest.find({
-      technician_id: req.user.id,
-    })
-      .populate('user_id', 'name phone address')
-      .populate({
-        path: 'appliance_id',
-        populate: {
-          path: 'model',
-          populate: {
-            path: 'brand_id',
-            populate: {
-              path: 'category_id',
-            },
-          },
-        },
-      })
-      .sort({ created_at: -1 });
-
-    res.json(requests);
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-};
-
-
-exports.acceptServiceRequest = async (req, res) => {
-  try {
+    const { aadhaar_number } = req.body;
     const technicianId = req.user.id;
-    const { request_id } = req.params;
 
-    const request = await ServiceRequest.findOneAndUpdate(
-      {
-        _id: request_id,
-        status: 'broadcasted',
-        technician_id: null,
-        broadcasted_to: technicianId,
-      },
-      {
-        technician_id: technicianId,
-        status: 'accepted',
-      },
-      { new: true }
-    );
-
-    if (!request) {
-      return res.status(409).json({
-        message: 'Request already accepted by another technician',
-      });
+    if (!aadhaar_number) {
+      return res.status(400).json({ message: 'Aadhaar number is required.' });
     }
 
-    res.json({
-      message: 'Service request accepted successfully',
-      request,
-    });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-};
-
-
-exports.getProfile = async (req, res) => {
-  try {
-    const technicianId = req.user.id; // from JWT
-
-    const technician = await Technician.findById(technicianId).select('-password');
-
-    if (!technician) {
-      return res.status(404).json({ message: 'Technician not found' });
+    // Check if Aadhaar number is unique
+    const existingTechnician = await Technician.findOne({ aadhaar_number });
+    if (existingTechnician && existingTechnician._id.toString() !== technicianId) {
+      return res.status(400).json({ message: 'Aadhaar number is already registered with another account.' });
     }
 
-    res.json(technician);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
+    const updates = {
+      aadhaar_number,
+      verificationStatus: 'submitted',
+      documents: {}
+    };
 
-exports.updateServiceStatus = async (req, res) => {
-  try {
-    const technicianId = req.user.id;
-    const { request_id } = req.params;
-    const { status } = req.body;
-
-    const allowedStatuses = ['in_progress', 'completed'];
-
-    if (!allowedStatuses.includes(status)) {
-      return res.status(400).json({
-        message: 'Invalid status update',
-      });
+    if (req.files['id_proof']) {
+      updates.documents.id_proof = req.files['id_proof'][0].path;
+    }
+    if (req.files['live_photo']) {
+      updates.documents.live_photo = req.files['live_photo'][0].path;
+    }
+    if (req.files['certification']) {
+      updates.documents.certification = req.files['certification'][0].path;
     }
 
-    const request = await ServiceRequest.findOne({
-      _id: request_id,
-      technician_id: technicianId,
-    });
+    // Preserve existing documents if not uploaded new ones
+    const currentTech = await Technician.findById(technicianId);
+    updates.documents = { ...currentTech.documents, ...updates.documents };
 
-    if (!request) {
-      return res.status(404).json({
-        message: 'Service request not found or not assigned to you',
-      });
+    // Ensure all required docs are present (Basic validation)
+    if (!updates.documents.id_proof || !updates.documents.live_photo) {
+      // Note: Certification might be optional depending on business logic, but strict ID is key.
+      // For now, let's require at least ID Proof and Live Photo for submission.
     }
-
-    
-    if (status === 'in_progress' && request.status !== 'accepted') {
-      return res.status(409).json({
-        message: 'Request must be accepted before starting',
-      });
-    }
-
-    if (status === 'completed' && request.status !== 'in_progress') {
-      return res.status(409).json({
-        message: 'Request must be in progress before completing',
-      });
-    }
-
-    request.status = status;
-    await request.save();
-
-    res.json({
-      message: `Service marked as ${status}`,
-      request,
-    });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-};
-
-
-exports.updateProfile = async (req, res) => {
-  try {
-    const technicianId = req.user.id;
-    const updates = req.body;
-
-    
-    delete updates.password;
-    delete updates.role;
-    delete updates.email; 
 
     const technician = await Technician.findByIdAndUpdate(
       technicianId,
       { $set: updates },
-      { new: true, runValidators: true }
-    ).select('-password');
+      { new: true }
+    );
 
+    res.status(200).json({ message: 'Verification documents submitted successfully.', technician });
+
+  } catch (error) {
+    res.status(500).json({ message: 'Server error during document upload.' });
+  }
+};
+
+exports.getProfile = async (req, res) => {
+  try {
+    const technician = await Technician.findById(req.user.id).select('-password');
     if (!technician) {
       return res.status(404).json({ message: 'Technician not found' });
     }
-
-    res.json({
-      message: 'Profile updated successfully',
-      technician,
-    });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
+    res.json(technician);
+  } catch (error) {
+    console.error('Error fetching technician profile:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 };
+

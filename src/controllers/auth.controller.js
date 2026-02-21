@@ -2,6 +2,7 @@ const jwt = require('jsonwebtoken');
 
 const { User, Technician, Admin } = require('../models');
 const Otp = require('../models/Otp');
+const Subscription = require('../models/Subscription');
 
 const { hashPassword, comparePassword } = require('../utils/password');
 const { generateOtp, getOtpExpiry } = require('../utils/otp');
@@ -33,11 +34,11 @@ exports.registerUser = async (req, res) => {
 
     const hashedPassword = await hashPassword(password);
 
-    
+
     const otp = generateOtp();
     await Otp.deleteMany({ email, role: 'user_verification' });
 
-    
+
     await Otp.create({
       email,
       role: 'user_verification',
@@ -53,7 +54,7 @@ exports.registerUser = async (req, res) => {
       }
     });
 
-    
+
     const subject = 'ElectroCare: Verify Your Email';
     const html = `
       <h3>Welcome to ElectroCare!</h3>
@@ -79,7 +80,7 @@ exports.resendVerificationUser = async (req, res) => {
     if (!user) return res.status(404).json({ message: 'User not found' });
     if (user.isVerified) return res.status(400).json({ message: 'User is already verified' });
 
-    
+
     const otp = generateOtp();
     await Otp.deleteMany({ email, role: 'user_verification' });
 
@@ -88,10 +89,10 @@ exports.resendVerificationUser = async (req, res) => {
       role: 'user_verification',
       otp,
       expiresAt: getOtpExpiry(),
-      
+
     });
 
-    
+
     const subject = 'ElectroCare: Verify Your Email';
     const html = `
       <h3>Email Verification</h3>
@@ -118,7 +119,7 @@ exports.verifyEmailUser = async (req, res) => {
     }
 
     if (!record.registrationData) {
-      
+
       const existingUser = await User.findOne({ email });
       if (existingUser) {
         existingUser.isVerified = true;
@@ -130,9 +131,20 @@ exports.verifyEmailUser = async (req, res) => {
       return res.status(400).json({ message: 'Registration data not found. Please register again.' });
     }
 
-    
+
     const userData = record.registrationData;
     const user = await User.create(userData);
+
+    // Create Default Gold Subscription
+    await Subscription.create({
+      user_id: user._id,
+      plan: 'gold',
+      start_date: new Date(),
+      end_date: new Date(new Date().setFullYear(new Date().getFullYear() + 100)), // Lifetime validity for free plan
+      status: 'active',
+      total_visits_limit: 0,
+      free_visits_used: 0
+    });
 
     await Otp.deleteMany({ email, role: 'user_verification' });
 
@@ -246,7 +258,7 @@ exports.resetPasswordUser = async (req, res) => {
 // TECHNICIAN REGISTER
 exports.registerTechnician = async (req, res) => {
   try {
-    const { name, email, phone, password, skills, latitude, longitude } = req.body;
+    const { name, email, phone, password, skills, latitude, longitude, pincode } = req.body;
 
     if (!name || !phone || !password) {
       return res.status(400).json({ message: 'Missing required fields' });
@@ -282,6 +294,7 @@ exports.registerTechnician = async (req, res) => {
         phone,
         password: hashedPassword,
         skills,
+        pincode, // Store pincode
         location: {
           type: 'Point',
           coordinates: [lng, lat],

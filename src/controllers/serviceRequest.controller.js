@@ -5,6 +5,7 @@ const Notification = require('../models/Notification');
 const RequestQueue = require('../models/RequestQueue');
 const Transaction = require('../models/Transaction');
 const User = require('../models/User');
+const Subscription = require('../models/Subscription');
 
 exports.acceptServiceRequest = async (req, res) => {
   const session = await mongoose.startSession();
@@ -17,7 +18,7 @@ exports.acceptServiceRequest = async (req, res) => {
 
     const technician = await Technician.findById(technicianId).session(session);
 
-    
+
     if (!technician) {
       await session.abortTransaction();
       return res.status(404).json({ message: 'Technician not found' });
@@ -71,7 +72,7 @@ exports.acceptServiceRequest = async (req, res) => {
       { session }
     );
 
-    
+
     await RequestQueue.findOneAndUpdate(
       { request_id: requestId, technician_id: technicianId },
       { response_status: 'accepted', response_time: new Date() },
@@ -119,7 +120,7 @@ exports.markOnTheWay = async (req, res) => {
   );
 
   if (!service) {
-    
+
     const check = await ServiceRequest.findById(requestId);
     console.error(`[MarkOnTheWay] Failed. Service State:`, check);
     return res.status(403).json({ message: 'Not allowed' });
@@ -182,7 +183,7 @@ exports.approveEstimate = async (req, res) => {
 exports.completeService = async (req, res) => {
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
-  
+
   const service = await ServiceRequest.findOne({
     _id: req.params.requestId,
     technician_id: req.user.id,
@@ -193,12 +194,12 @@ exports.completeService = async (req, res) => {
     return res.status(404).json({ message: 'Service request not found or not in valid state' });
   }
 
-  
+
   service.completion_otp = otp;
-  
+
   await service.save();
 
-  
+
   const sendEmail = require('../utils/email');
   const emailHtml = `
     <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
@@ -217,7 +218,7 @@ exports.completeService = async (req, res) => {
     await sendEmail(service.user_id.email, 'ElectroCare - Service Completion OTP', emailHtml);
   } catch (error) {
     console.error('Failed to send OTP email:', error);
-    
+
   }
 
   res.json({ message: 'OTP sent to user email', otp_sent: true });
@@ -238,7 +239,7 @@ exports.verifyOtpAndPay = async (req, res) => {
   service.completed_at = new Date();
   await service.save();
 
-  
+
   await Technician.updateMany(
     { _id: service.technician_id, loyalty_points: { $exists: false } },
     { $set: { loyalty_points: 100 } }
@@ -249,13 +250,13 @@ exports.verifyOtpAndPay = async (req, res) => {
   const balanceToPay = totalCost - alreadyPaid;
 
   if (balanceToPay > 0) {
-    
+
     await Transaction.create({
       user_id: service.user_id,
       technician_id: service.technician_id,
       amount: balanceToPay,
       type: 'debit',
-      category: 'service_payment', 
+      category: 'service_payment',
       description: `Balance payment for service (Total: ${totalCost}, Paid: ${alreadyPaid})`,
       status: 'success',
       related_request_id: service._id
@@ -264,7 +265,7 @@ exports.verifyOtpAndPay = async (req, res) => {
 
   if (service.visit_fee_paid) {
     await Technician.findByIdAndUpdate(service.technician_id, {
-      $inc: { wallet_balance: 150 }
+      $inc: { wallet_balance: 150, completed_jobs: 1 }
     });
 
     await Transaction.create({
@@ -308,17 +309,24 @@ exports.cancelByUser = async (req, res) => {
     return res.status(404).json({ message: 'Service not found' });
   }
 
-  
+
   if (['approved', 'in_progress', 'completed'].includes(service.status)) {
     return res.status(403).json({
       message: 'Cancellation not allowed at this stage. Please contact support.',
     });
   }
 
-  
+
   if (['pending', 'broadcasted', 'accepted'].includes(service.status)) {
-    if (service.visit_fee_paid) {
-      
+    if (service.used_free_visit) {
+      // Restore Free Visit
+      await Subscription.findOneAndUpdate(
+        { user_id: req.user.id, status: 'active' },
+        { $inc: { free_visits_used: -1, total_visits_used: -1 } }
+      );
+    }
+    else if (service.visit_fee_paid) {
+
       await User.findByIdAndUpdate(req.user.id, { $inc: { wallet_balance: 200 } });
       await Transaction.create({
         user_id: req.user.id,
@@ -332,21 +340,66 @@ exports.cancelByUser = async (req, res) => {
     }
   }
 
-  
+
   else if (service.status === 'on_the_way') {
-    
+
     await User.findByIdAndUpdate(req.user.id, {
       $inc: { loyalty_points: -15 }
     });
 
-    
-    
+    // Free Visit Cancellation Logic
+    if (service.used_free_visit) {
+      // 1. Restore Free Visit
+      await Subscription.findOneAndUpdate(
+        { user_id: req.user.id, status: 'active' },
+        { $inc: { free_visits_used: -1, total_visits_used: -1 } }
+      );
+
+      // 2. Pay Technician 75 (Platform Fund)
+      if (service.technician_id) {
+        await Technician.findByIdAndUpdate(service.technician_id, { $inc: { wallet_balance: 75 } });
+        await Transaction.create({
+          technician_id: service.technician_id,
+          amount: 75,
+          type: 'credit',
+          category: 'technician_payout', // Platform funded
+          description: 'Compensation for cancelled Free Visit (User Cancelled On The Way)',
+          status: 'success',
+          related_request_id: service._id
+        });
+      }
+    }
+    // Paid Visit Logic (Existing)
+    else {
+      // ... (Existing penalty logic if any, currently specific penalty logic was removed/not present for user cancel other than loyalty points)
+      // Wait, current code checks visit_fee_paid in other blocks but nothing here?
+      // Ah, for 'on_the_way', user loses visit fee if paid? 
+      // Existing code had no refund logic for 'on_the_way', meaning NO REFUND.
+      // So we leave it as is.
+    }
   }
 
-  
+
   else if (service.status === 'awaiting_approval') {
-    if (service.visit_fee_paid) {
-      
+    if (service.used_free_visit) {
+      // Visit Consumed - Do NOT restore (User request: "only minus if user cancel the estimate")
+
+      // Pay Technician full visit share (150) since visit marks as used
+      if (service.technician_id) {
+        await Technician.findByIdAndUpdate(service.technician_id, { $inc: { wallet_balance: 150 } });
+        await Transaction.create({
+          technician_id: service.technician_id,
+          amount: 150,
+          type: 'credit',
+          category: 'technician_payout',
+          description: 'Compensation for cancelled Free Visit (Cancelled at Estimate)',
+          status: 'success',
+          related_request_id: service._id
+        });
+      }
+    }
+    else if (service.visit_fee_paid) {
+
       await User.findByIdAndUpdate(req.user.id, { $inc: { wallet_balance: 75 } });
       await Transaction.create({
         user_id: req.user.id,
@@ -358,7 +411,7 @@ exports.cancelByUser = async (req, res) => {
         related_request_id: service._id
       });
 
-      
+
       if (service.technician_id) {
         await Technician.findByIdAndUpdate(service.technician_id, { $inc: { wallet_balance: 100 } });
         await Transaction.create({
@@ -372,7 +425,7 @@ exports.cancelByUser = async (req, res) => {
         });
       }
 
-      
+
     }
   }
 
@@ -408,7 +461,7 @@ exports.cancelByTechnician = async (req, res) => {
     return res.status(404).json({ message: 'Service not found' });
   }
 
-  
+
   if (['awaiting_approval', 'approved', 'in_progress', 'completed'].includes(service.status)) {
     return res.status(403).json({
       message: 'Cancellation not allowed after submitting estimate',
@@ -417,7 +470,7 @@ exports.cancelByTechnician = async (req, res) => {
 
   const technician = await Technician.findById(req.user.id);
 
-  
+
   if (typeof technician.loyalty_points !== 'number') {
     technician.loyalty_points = 100;
   }
@@ -425,7 +478,7 @@ exports.cancelByTechnician = async (req, res) => {
   if (service.status === 'on_the_way') {
     technician.loyalty_points -= 15;
 
-    
+
     if (service.visit_fee_paid) {
       await User.findByIdAndUpdate(service.user_id, { $inc: { wallet_balance: 200 } });
       await Transaction.create({
@@ -446,7 +499,7 @@ exports.cancelByTechnician = async (req, res) => {
       );
     }
 
-    
+
     service.status = 'cancelled';
     await service.save();
 
@@ -458,14 +511,14 @@ exports.cancelByTechnician = async (req, res) => {
     });
 
   } else {
-    
+
     service.technician_id = null;
     service.accepted_at = null;
     service.on_the_way_at = null;
     service.status = 'broadcasted';
     await service.save();
 
-    
+
     await RequestQueue.findOneAndUpdate(
       { request_id: requestId, technician_id: req.user.id },
       { response_status: 'rejected', response_time: new Date() }
@@ -479,10 +532,10 @@ exports.cancelByTechnician = async (req, res) => {
     });
   }
 
-  
+
   await technician.save();
 
-  
+
   if (technician.status !== 'suspended') {
     technician.status = 'active';
     technician.is_available = true;
@@ -512,7 +565,7 @@ exports.getTechnicianRequests = async (req, res) => {
   try {
     const technicianId = req.user.id;
 
-    
+
     const queueItems = await RequestQueue.find({
       technician_id: technicianId,
       response_status: 'pending'
@@ -521,17 +574,17 @@ exports.getTechnicianRequests = async (req, res) => {
       populate: { path: 'user_id', select: 'name phone address loyalty_points' }
     });
 
-    
+
     const broadcastedRequests = queueItems
       .map(item => item.request_id)
       .filter(req => req && req.status === 'broadcasted');
 
-    
+
     const myJobs = await ServiceRequest.find({
       technician_id: technicianId
     }).populate('user_id', 'name phone address loyalty_points');
 
-    
+
     const allRequests = [...broadcastedRequests, ...myJobs].sort((a, b) =>
       new Date(b.created_at) - new Date(a.created_at)
     );

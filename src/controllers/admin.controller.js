@@ -17,11 +17,11 @@ exports.getDashboardStats = async (req, res) => {
       if (t.category === 'subscription_purchase') {
         totalRevenue += t.amount;
       } else if (t.category === 'visit_fee_payment') {
-        
+
       }
     });
 
-    
+
     const Payment = require('../models/Payment');
     const paymentRevenue = await Payment.aggregate([
       { $match: { status: 'success' } },
@@ -29,7 +29,7 @@ exports.getDashboardStats = async (req, res) => {
     ]);
     const visitFeeRevenue = paymentRevenue[0]?.total || 0;
 
-    
+
     const subRevenue = await Transaction.aggregate([
       { $match: { category: 'subscription_purchase', status: 'success' } },
       { $group: { _id: null, total: { $sum: '$amount' } } }
@@ -72,13 +72,26 @@ exports.getAllTechnicians = async (req, res) => {
 exports.verifyTechnician = async (req, res) => {
   try {
     const { id } = req.params;
+    const { status, rejection_reason } = req.body; // 'approved' or 'rejected'
+
+    if (!['approved', 'rejected'].includes(status)) {
+      return res.status(400).json({ message: 'Invalid status' });
+    }
+
     const technician = await Technician.findById(id);
     if (!technician) return res.status(404).json({ message: 'Technician not found' });
 
-    technician.isVerified = true;
+    technician.verificationStatus = status;
+
+    if (status === 'rejected') {
+      technician.documents.rejection_reason = rejection_reason || 'Documents rejected';
+    } else if (status === 'approved') {
+      technician.documents.rejection_reason = "";
+    }
+
     await technician.save();
 
-    res.json({ message: 'Technician verified successfully' });
+    res.json({ message: `Technician ${status} successfully`, technician });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -100,7 +113,7 @@ exports.getAllServiceRequests = async (req, res) => {
 
 exports.getReportData = async (req, res) => {
   try {
-    const { type } = req.query; 
+    const { type } = req.query;
 
     if (type === 'users') {
       const data = await User.find().select('name email phone wallet_balance createdAt isVerified loyalty_points');
@@ -149,7 +162,7 @@ exports.updateUser = async (req, res) => {
     const { id } = req.params;
     const updates = req.body;
 
-    
+
     delete updates.password;
 
     const user = await User.findByIdAndUpdate(id, updates, { new: true });

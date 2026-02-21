@@ -9,17 +9,13 @@ const feedbackRoutes = require('./routes/feedback.routes');
 
 /* -------------------- Middlewares -------------------- */
 app.use(cors({
-  origin: [
-    'http://localhost:5173',
-    'http://localhost:5174',
-    'http://localhost:3000',
-    'http://localhost:8080',
-    'https://electro-cares.vercel.app'
-  ],
+  origin: true, // Allow any origin dynamically (best for local dev)
   credentials: true
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 /* -------------------- API Routes -------------------- */
 app.use('/api/appliances', applianceRoutes);
