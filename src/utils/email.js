@@ -1,36 +1,44 @@
-const nodemailer = require('nodemailer');
+const Brevo = require('@getbrevo/brevo');
 
-const transporter = nodemailer.createTransport({
-    host: process.env.EMAIL_HOST,
-    port: Number(process.env.EMAIL_PORT),
-    secure: false, // 587 is STARTTLS
-    auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-    },
-});
-
+/**
+ * Sends an email using Brevo REST API
+ * @param {string} to - Recipient email
+ * @param {string} subject - Email subject
+ * @param {string} html - Email body in HTML
+ */
 const sendEmail = async (to, subject, html) => {
     try {
-        const fromEmail = process.env.EMAIL_FROM || 'kailashsinhrajput25@gmail.com';
-        const info = await transporter.sendMail({
-            from: `"ElectroCare" <${fromEmail}>`,
-            to,
-            subject,
-            html,
-        });
+        const apiInstance = new Brevo.TransactionalEmailsApi();
 
-        console.log("Email sent successfully:");
-        console.log("Message ID:", info.messageId);
-        console.log("Response:", info.response);
-        return info;
+        // Configure API key
+        const apiKey = apiInstance.authentications['apiKey'];
+        apiKey.apiKey = process.env.BREVO_API_KEY;
+
+        const sendSmtpEmail = new Brevo.SendSmtpEmail();
+
+        sendSmtpEmail.subject = subject;
+        sendSmtpEmail.htmlContent = html;
+        sendSmtpEmail.sender = {
+            name: "ElectroCare",
+            email: process.env.EMAIL_FROM || "kailashsinhrajput25@gmail.com"
+        };
+        sendSmtpEmail.to = [{ email: to }];
+
+        console.log(`[EMAIL] Attempting to send email to ${to} via Brevo REST API...`);
+
+        const data = await apiInstance.sendTransacEmail(sendSmtpEmail);
+
+        console.log('[EMAIL] Email sent successfully. Message ID:', data.body.messageId);
+        return data;
     } catch (error) {
-        console.error("CRITICAL ERROR: Failed to send email via Brevo:");
-        console.error("Error Code:", error.code);
-        console.error("Error Message:", error.message);
-        if (error.response) {
-            console.error("SMTP Response:", error.response);
+        console.error('[EMAIL] CRITICAL ERROR: Failed to send email via Brevo REST API:');
+
+        if (error.response && error.response.body) {
+            console.error('Brevo API Response Error:', JSON.stringify(error.response.body, null, 2));
+        } else {
+            console.error('Error Message:', error.message);
         }
+
         throw error;
     }
 };
