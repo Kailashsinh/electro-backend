@@ -8,8 +8,14 @@ const { BrevoClient } = require('@getbrevo/brevo');
  */
 const sendEmail = async (to, subject, html) => {
     try {
+        const apiKey = process.env.BREVO_API_KEY || process.env.EMAIL_PASS;
+
+        if (!apiKey) {
+            throw new Error("Missing Brevo API Key. Please set BREVO_API_KEY or EMAIL_PASS in your environment variables.");
+        }
+
         const client = new BrevoClient({
-            apiKey: process.env.BREVO_API_KEY,
+            apiKey: apiKey,
         });
 
         console.log(`[EMAIL] Attempting to send email to ${to} via Brevo REST API...`);
