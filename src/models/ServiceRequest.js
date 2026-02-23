@@ -126,7 +126,7 @@ const ServiceRequestSchema = new mongoose.Schema(
     },
     subscription_plan: {
       type: String,
-      enum: ['basic', 'premium', 'premium_pro'],
+      enum: ['basic', 'gold', 'premium', 'premium_pro'],
       default: 'basic',
     },
 

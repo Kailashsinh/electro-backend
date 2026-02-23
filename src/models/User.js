@@ -7,7 +7,7 @@ const UserSchema = new mongoose.Schema({
   password: { type: String, required: true },
   address: { type: String, default: null },
   registered_at: { type: Date, default: Date.now },
-  loyalty_points: { type: Number, default: 50 },
+  loyalty_points: { type: Number, default: 100 },
   rating: { type: Number, min: 0, max: 5, default: null },
   isVerified: { type: Boolean, default: false },
   wallet_balance: { type: Number, default: 0 },
