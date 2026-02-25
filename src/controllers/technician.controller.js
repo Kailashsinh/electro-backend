@@ -1,4 +1,6 @@
 const Technician = require('../models/Technician');
+const { encrypt, decrypt } = require('../utils/crypto');
+const bcrypt = require('bcryptjs');
 
 exports.uploadVerificationDocuments = async (req, res) => {
   try {
@@ -34,12 +36,6 @@ exports.uploadVerificationDocuments = async (req, res) => {
     // Preserve existing documents if not uploaded new ones
     const currentTech = await Technician.findById(technicianId);
     updates.documents = { ...currentTech.documents, ...updates.documents };
-
-    // Ensure all required docs are present (Basic validation)
-    if (!updates.documents.id_proof || !updates.documents.live_photo) {
-      // Note: Certification might be optional depending on business logic, but strict ID is key.
-      // For now, let's require at least ID Proof and Live Photo for submission.
-    }
 
     const technician = await Technician.findByIdAndUpdate(
       technicianId,
@@ -88,3 +84,64 @@ exports.updateLocation = async (req, res) => {
   }
 };
 
+exports.getPayoutSettings = async (req, res) => {
+  try {
+    const technician = await Technician.findById(req.user.id).select('payment_details');
+    if (!technician) return res.status(404).json({ message: 'Technician not found' });
+
+    const details = technician.payment_details || { method: 'none' };
+    const response = {
+      method: details.method,
+      is_verified: details.is_verified,
+      bank: details.bank ? {
+        bank_name: details.bank.bank_name,
+        account_number: details.bank.account_number ? 'XXXXXXXX' + decrypt(details.bank.account_number).slice(-4) : null,
+        ifsc_code: details.bank.ifsc_code ? decrypt(details.bank.ifsc_code) : null,
+        account_holder: details.bank.account_holder ? decrypt(details.bank.account_holder) : null,
+      } : null,
+      upi: details.upi ? {
+        upi_id: details.upi.upi_id ? decrypt(details.upi.upi_id) : null
+      } : null
+    };
+
+    res.json(response);
+  } catch (error) {
+    console.error('getPayoutSettings Error:', error);
+    res.status(500).json({ message: 'Server error fetching payout settings' });
+  }
+};
+
+exports.updatePayoutSettings = async (req, res) => {
+  try {
+    const { password, method, bank, upi } = req.body;
+    const technician = await Technician.findById(req.user.id);
+
+    if (!technician) return res.status(404).json({ message: 'Technician not found' });
+
+    // Verify password for security
+    const isMatch = await bcrypt.compare(password, technician.password);
+    if (!isMatch) return res.status(401).json({ message: 'Invalid password. Security check failed.' });
+
+    const payment_details = {
+      method,
+      is_verified: false, // Reset verification on change
+      bank: method === 'bank' ? {
+        bank_name: bank.bank_name,
+        account_number: encrypt(bank.account_number),
+        ifsc_code: encrypt(bank.ifsc_code),
+        account_holder: encrypt(bank.account_holder)
+      } : undefined,
+      upi: method === 'upi' ? {
+        upi_id: encrypt(upi.upi_id)
+      } : undefined
+    };
+
+    technician.payment_details = payment_details;
+    await technician.save();
+
+    res.json({ message: 'Payout settings updated securely.' });
+  } catch (error) {
+    console.error('updatePayoutSettings Error:', error);
+    res.status(500).json({ message: 'Server error updating payout settings' });
+  }
+};

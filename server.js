@@ -10,9 +10,12 @@ const PORT = process.env.PORT || 5000;
 
 
 const startServer = async () => {
+  if (!process.env.MONGO_URI) {
+    console.error('CRITICAL: MONGO_URI is not defined in environment variables.');
+  }
   await mongoDB(process.env.MONGO_URI);
 
-  
+
   const server = http.createServer(app);
 
 

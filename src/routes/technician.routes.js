@@ -18,4 +18,8 @@ router.post(
 router.get('/profile', authMiddleware('technician'), technicianController.getProfile);
 router.patch('/location', authMiddleware('technician'), technicianController.updateLocation);
 
+// Payout Settings (Secure)
+router.get('/payout-settings', authMiddleware('technician'), technicianController.getPayoutSettings);
+router.patch('/payout-settings', authMiddleware('technician'), technicianController.updatePayoutSettings);
+
 module.exports = router;

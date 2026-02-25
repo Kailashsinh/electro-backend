@@ -28,7 +28,7 @@ exports.getProfile = async (req, res) => {
 exports.updateProfile = async (req, res) => {
   try {
     const userId = req.user.id;
-    const { name, email, phone, address, profile_picture } = req.body;
+    const { name, email, phone, address, profile_picture, wallet_balance } = req.body;
 
     const user = await User.findById(userId);
     if (!user) return res.status(404).json({ message: 'User not found' });
@@ -38,6 +38,7 @@ exports.updateProfile = async (req, res) => {
     if (phone) user.phone = phone;
     if (address) user.address = address;
     if (profile_picture) user.profile_picture = profile_picture;
+    if (wallet_balance !== undefined) user.wallet_balance = wallet_balance;
 
     await user.save();
     res.json({ message: 'Profile updated successfully', user });
@@ -55,19 +56,19 @@ exports.changePassword = async (req, res) => {
       return res.status(400).json({ message: 'Please provide both current and new passwords' });
     }
 
-    
+
     const user = await User.findById(userId);
     if (!user) return res.status(404).json({ message: 'User not found' });
 
-    
-    const { comparePassword, hashPassword } = require('../utils/password'); 
+
+    const { comparePassword, hashPassword } = require('../utils/password');
     const isMatch = await comparePassword(currentPassword, user.password);
 
     if (!isMatch) {
       return res.status(401).json({ message: 'Incorrect current password' });
     }
 
-    
+
     user.password = await hashPassword(newPassword);
     await user.save();
 

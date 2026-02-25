@@ -15,10 +15,10 @@ const diagnoseIssue = async (applianceType, problemDescription) => {
       
       Diagnose the issue and provide the following details in strict JSON format:
       {
-        "likely_cause": "Brief explanation of what might be wrong",
-        "estimated_cost_range": "Estimated repair cost in INR (e.g., ₹500 - ₹1500)",
+        "diagnosis": "A concise, technical summary of the identified problem",
+        "explanation": "A detailed technical breakdown of why this occurred based on telemetry",
+        "solution": "Immediate resolution matrix or recommended next steps",
         "severity": "low | medium | high",
-        "advice": "Actionable advice for the user (e.g., Check power supply, Do not use, etc.)",
         "is_safe_to_use": true or false
       }
       
@@ -29,7 +29,7 @@ const diagnoseIssue = async (applianceType, problemDescription) => {
     const response = await result.response;
     const text = response.text();
 
-    
+
     const cleanText = text.replace(/```json/g, '').replace(/```/g, '').trim();
 
     return JSON.parse(cleanText);

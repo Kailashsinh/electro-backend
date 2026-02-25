@@ -2,7 +2,7 @@ const Payment = require('../models/Payment');
 const ServiceRequest = require('../models/ServiceRequest');
 const Subscription = require('../models/Subscription');
 const RequestQueue = require('../models/RequestQueue');
-const { findNearestTechnicians } = require('../utils/geo');
+const { findNearestTechnicians, geocodeAddress } = require('../utils/geo');
 
 exports.payVisitFee = async (req, res) => {
   try {
@@ -25,6 +25,18 @@ exports.payVisitFee = async (req, res) => {
       }
     }
 
+    // --- Geocoding Logic ---
+    let latNum = parseFloat(latitude);
+    let lngNum = parseFloat(longitude);
+
+    if (!latNum || !lngNum || latNum === 0 || lngNum === 0) {
+      console.log("[PaymentController] Missing coordinates, attempting geocoding for:", address_details);
+      const coords = await geocodeAddress(address_details);
+      if (coords) {
+        [latNum, lngNum] = coords;
+      }
+    }
+
     // Check for active subscription
     const subscription = await Subscription.findOne({
       user_id: req.user.id,
@@ -44,12 +56,6 @@ exports.payVisitFee = async (req, res) => {
       if (plan === 'premium_pro') priority_level = 3;
 
       // Check free visit eligibility
-      // Basic: 0 free
-      // Premium: 3 free
-      // Premium Pro: Unlimited (or specialized logic?)
-
-      // Let's use the fields from subscription model if available, or hardcode rules
-      // Assumed rules based on previous tasks:
       const visitLimit = subscription.total_visits_limit || 0;
       if (subscription.free_visits_used < visitLimit) {
         allowFreeVisit = true;
@@ -59,16 +65,11 @@ exports.payVisitFee = async (req, res) => {
 
     // If not free visit, we assume payment is handled via gateway (mocked here)
     if (!allowFreeVisit) {
-      // In a real app, verifying payment_id would happen here
-      visit_fee_paid = true; // For now, assume payment success if they hit this endpoint
+      visit_fee_paid = true; // Mock payment success
     }
 
     let technicians = [];
-    // Convert to numbers explicitly
-    const latNum = parseFloat(latitude);
-    const lngNum = parseFloat(longitude);
-
-    // Pass pincode to geo search
+    // Pass pincode to geo search (coordinates are now floats from geocoding/input)
     technicians = await findNearestTechnicians(latNum, lngNum, address_details?.pincode);
 
     const issueImages = (req.files && Array.isArray(req.files)) ? req.files.map(file => file.path) : [];

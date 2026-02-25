@@ -1,4 +1,5 @@
 const { User, Technician, ServiceRequest, Transaction, Payment, Appliance } = require('../models');
+const { decrypt } = require('../utils/crypto');
 
 
 exports.getDashboardStats = async (req, res) => {
@@ -249,6 +250,41 @@ exports.deleteAppliance = async (req, res) => {
     const appliance = await Appliance.findByIdAndDelete(id);
     if (!appliance) return res.status(404).json({ message: 'Appliance not found' });
     res.json({ message: 'Appliance deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+exports.getTechnicianPayouts = async (req, res) => {
+  try {
+    const technicians = await Technician.find({
+      'payment_details.method': { $ne: 'none' }
+    }).select('name email phone payment_details wallet_balance');
+
+    const payouts = technicians.map(tech => {
+      const details = tech.payment_details;
+      const formatted = {
+        _id: tech._id,
+        name: tech.name,
+        email: tech.email,
+        phone: tech.phone,
+        wallet_balance: tech.wallet_balance || 0,
+        method: details.method,
+        is_verified: details.is_verified,
+        bank: details.method === 'bank' ? {
+          bank_name: details.bank.bank_name,
+          account_number: decrypt(details.bank.account_number),
+          ifsc_code: decrypt(details.bank.ifsc_code),
+          account_holder: decrypt(details.bank.account_holder)
+        } : null,
+        upi: details.method === 'upi' ? {
+          upi_id: decrypt(details.upi.upi_id)
+        } : null
+      };
+      return formatted;
+    });
+
+    res.json(payouts);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

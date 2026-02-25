@@ -15,6 +15,7 @@ router.get('/users', adminController.getAllUsers);
 // Technicians
 router.get('/technicians', adminController.getAllTechnicians);
 router.patch('/technicians/:id/verify', adminController.verifyTechnician);
+router.get('/technicians/payouts', adminController.getTechnicianPayouts);
 
 // Appliances
 router.get('/appliances', adminController.getAllAppliances);

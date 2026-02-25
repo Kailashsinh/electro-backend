@@ -38,10 +38,24 @@ exports.acceptServiceRequest = async (req, res) => {
       });
     }
 
-    if (!technician.is_available) {
+    const targetRequest = await ServiceRequest.findById(requestId).session(session);
+    if (!targetRequest) {
+      await session.abortTransaction();
+      return res.status(404).json({ message: 'Service request not found' });
+    }
+
+    // Check for slot conflict
+    const conflict = await ServiceRequest.findOne({
+      technician_id: technicianId,
+      status: { $in: ['accepted', 'on_the_way', 'awaiting_approval', 'approved', 'in_progress'] },
+      scheduled_date: targetRequest.scheduled_date,
+      preferred_slot: targetRequest.preferred_slot
+    }).session(session);
+
+    if (conflict) {
       await session.abortTransaction();
       return res.status(403).json({
-        message: 'Technician is currently busy',
+        message: 'You already have another job scheduled for this date and time slot.',
       });
     }
 
@@ -62,16 +76,11 @@ exports.acceptServiceRequest = async (req, res) => {
     if (!serviceRequest) {
       await session.abortTransaction();
       return res.status(409).json({
-        message: 'Service request already accepted',
+        message: 'Service request already accepted or no longer available',
       });
     }
 
-    await Technician.findByIdAndUpdate(
-      technicianId,
-      { status: 'busy', is_available: false },
-      { session }
-    );
-
+    // Do NOT set technician to busy/is_available:false here, they can take other slots.
 
     await RequestQueue.findOneAndUpdate(
       { request_id: requestId, technician_id: technicianId },
@@ -120,11 +129,16 @@ exports.markOnTheWay = async (req, res) => {
   );
 
   if (!service) {
-
     const check = await ServiceRequest.findById(requestId);
     console.error(`[MarkOnTheWay] Failed. Service State:`, check);
     return res.status(403).json({ message: 'Not allowed' });
   }
+
+  // Set technician to busy/unavailable while they are actively on a job
+  await Technician.findByIdAndUpdate(req.user.id, {
+    status: 'busy',
+    is_available: false
+  });
 
   await Notification.create({
     recipient_id: service.user_id,

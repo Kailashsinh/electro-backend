@@ -53,7 +53,7 @@ async function verifySystem() {
 
     await Transaction.create({
         user_id: user._id,
-        amount: 249,
+        amount: 299,
         type: 'debit',
         category: 'subscription_purchase',
         description: 'Verify: Purchased premium',
@@ -61,9 +61,9 @@ async function verifySystem() {
     });
 
     // Update User Wallet
-    user.wallet_balance -= 249;
+    user.wallet_balance -= 299;
     await user.save();
-    console.log(`✅ Paid 249 for Premium. New Wallet: ${user.wallet_balance}`);
+    console.log(`✅ Paid 299 for Premium. New Wallet: ${user.wallet_balance}`);
 
 
     // 3. SERVICE REQUEST FLOW (REFUND CANCELLATION)

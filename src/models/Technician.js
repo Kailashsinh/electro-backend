@@ -67,6 +67,21 @@ const TechnicianSchema = new mongoose.Schema({
     certification: { type: String, default: "" }, // Certification Image
     rejection_reason: { type: String, default: "" }
   },
+
+  /* ---------------- PAYOUT DETAILS (ENCRYPTED) ---------------- */
+  payment_details: {
+    method: { type: String, enum: ['bank', 'upi', 'none'], default: 'none' },
+    bank: {
+      account_number: { type: String, default: null }, // Encrypted
+      ifsc_code: { type: String, default: null },      // Encrypted
+      account_holder: { type: String, default: null },  // Encrypted
+      bank_name: { type: String, default: null }       // Plain text is okay for bank name
+    },
+    upi: {
+      upi_id: { type: String, default: null }          // Encrypted
+    },
+    is_verified: { type: Boolean, default: false }
+  },
 }, { timestamps: true });
 
 TechnicianSchema.index({ location: '2dsphere' });
