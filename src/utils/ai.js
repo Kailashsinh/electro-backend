@@ -15,10 +15,10 @@ const diagnoseIssue = async (applianceType, problemDescription) => {
       
       Diagnose the issue and provide the following details in strict JSON format:
       {
-        "diagnosis": "A concise, technical summary of the identified problem",
-        "explanation": "A detailed technical breakdown of why this occurred based on telemetry",
-        "solution": "Immediate resolution matrix or recommended next steps",
+        "likely_cause": "A concise, technical summary of the identified problem",
+        "estimated_cost_range": "An estimated cost range like '₹500 - ₹1,200'",
         "severity": "low | medium | high",
+        "advice": "Immediate resolution matrix or recommended next steps",
         "is_safe_to_use": true or false
       }
       

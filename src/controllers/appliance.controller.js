@@ -46,7 +46,6 @@ exports.registerAppliance = async (req, res) => {
       purchaseDate,
       serial_number,
       invoiceNumber,
-      installation_address,
     } = req.body;
 
     if (!category || !brand || !model || !purchaseDate) {
@@ -79,7 +78,6 @@ exports.registerAppliance = async (req, res) => {
       purchase_date: purchaseDate,
       serial_number,
       invoiceNumber,
-      installation_address,
     });
 
     res.status(201).json({
