@@ -50,8 +50,9 @@ exports.createServiceUsingSubscription = async (req, res) => {
 
 
   if (subscription.plan === 'premium_pro') {
-    if ((subscription.total_visits_used + 1) % 3 === 0) {
+    if (subscription.free_visits_used < 6) {
       isFreeVisit = true;
+      subscription.free_visits_used += 1;
     }
   }
 
