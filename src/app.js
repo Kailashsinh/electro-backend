@@ -33,6 +33,7 @@ app.use('/api/ai', require('./routes/ai.routes'));
 app.use('/api/subscription-services', require('./routes/subscriptionService.routes'));
 app.use('/api/subscriptions', require('./routes/subscription.routes'));
 app.use('/api/chat', require('./routes/chat.routes'));
+app.use('/api/reports', require('./routes/reportRoutes'));
 
 /* -------------------- Health Check -------------------- */
 app.get('/api/health', (req, res) => {

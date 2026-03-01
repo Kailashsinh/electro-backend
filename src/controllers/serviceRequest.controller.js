@@ -413,18 +413,17 @@ exports.cancelByUser = async (req, res) => {
       }
     }
     else if (service.visit_fee_paid) {
-
-      await User.findByIdAndUpdate(req.user.id, { $inc: { wallet_balance: 75 } });
+      // Platform takes ₹50 share. User gets ₹50 refund, Tech gets ₹100 for travel/time.
+      await User.findByIdAndUpdate(req.user.id, { $inc: { wallet_balance: 50 } });
       await Transaction.create({
         user_id: req.user.id,
-        amount: 75,
+        amount: 50,
         type: 'credit',
         category: 'visit_fee_refund',
-        description: 'Partial refund (Cancelled after estimate)',
+        description: 'Partial refund (Cancelled after estimate - ₹50 Platform Share)',
         status: 'success',
         related_request_id: service._id
       });
-
 
       if (service.technician_id) {
         await Technician.findByIdAndUpdate(service.technician_id, { $inc: { wallet_balance: 100 } });
@@ -438,8 +437,6 @@ exports.cancelByUser = async (req, res) => {
           related_request_id: service._id
         });
       }
-
-
     }
   }
 

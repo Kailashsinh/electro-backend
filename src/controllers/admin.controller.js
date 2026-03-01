@@ -114,39 +114,93 @@ exports.getAllServiceRequests = async (req, res) => {
 
 exports.getReportData = async (req, res) => {
   try {
-    const { type } = req.query;
+    const { type, startDate, endDate, status } = req.query;
+    let query = {};
+
+    if (startDate || endDate) {
+      query.createdAt = {};
+      if (startDate) query.createdAt.$gte = new Date(startDate);
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        query.createdAt.$lte = end;
+      }
+    }
 
     if (type === 'users') {
-      const data = await User.find().select('name email phone wallet_balance createdAt isVerified loyalty_points');
+      if (status === 'verified') query.isVerified = true;
+      if (status === 'unverified') query.isVerified = false;
+      const data = await User.find(query).select('name email phone wallet_balance createdAt isVerified loyalty_points');
       return res.json(data);
     }
 
     if (type === 'technicians') {
-      const data = await Technician.find().select('name email phone skills isVerified rating completed_jobs wallet_balance');
+      if (status === 'verified') query.isVerified = true;
+      if (status === 'unverified') query.isVerified = false;
+      const data = await Technician.find(query).select('name email phone skills isVerified rating completed_jobs wallet_balance');
       return res.json(data);
     }
 
     if (type === 'revenue') {
-      const payments = await Payment.find({ status: 'success' }).populate('user_id', 'name').sort({ createdAt: -1 });
-      const subs = await Transaction.find({ category: 'subscription_purchase', status: 'success' }).populate('user_id', 'name').sort({ createdAt: -1 });
+      const transactionQuery = { category: 'subscription_purchase', status: 'success' };
+      const requestQuery = { status: 'completed' };
 
-      // Combine and format
+      if (startDate || endDate) {
+        transactionQuery.createdAt = {};
+        requestQuery.completed_at = {};
+        if (startDate) {
+          const start = new Date(startDate);
+          transactionQuery.createdAt.$gte = start;
+          requestQuery.completed_at.$gte = start;
+        }
+        if (endDate) {
+          const end = new Date(endDate);
+          end.setHours(23, 59, 59, 999);
+          transactionQuery.createdAt.$lte = end;
+          requestQuery.completed_at.$lte = end;
+        }
+      }
+
+      const subs = await Transaction.find(transactionQuery).populate('user_id', 'name').sort({ createdAt: -1 });
+      const requests = await ServiceRequest.find({
+        ...requestQuery,
+        status: { $in: ['completed', 'cancelled'] }
+      }).populate('user_id', 'name').sort({ updatedAt: -1 });
+
       const revenueData = [
-        ...payments.map(p => ({
-          date: p.createdAt,
-          type: 'Visit Fee',
-          amount: p.amount,
-          platform_share: p.platform_share,
-          user: p.user_id?.name || 'Unknown'
-        })),
         ...subs.map(s => ({
           date: s.createdAt,
           type: 'Subscription',
           amount: s.amount,
-          platform_share: s.amount, // Full amount is revenue
+          platform_share: s.amount,
           user: s.user_id?.name || 'Unknown'
-        }))
-      ].sort((a, b) => new Date(b.date) - new Date(a.date));
+        })),
+        ...requests.map(req => {
+          let share = 0;
+          let label = req.status === 'completed' ? 'Visit Fee Share' : 'Cancellation Share';
+
+          if (req.status === 'completed') {
+            share = req.used_free_visit ? 0 : 50;
+          } else if (req.status === 'cancelled') {
+            // We only take share if the visit fee was paid and it reached a taxable stage
+            if (req.visit_fee_paid && !req.used_free_visit) {
+              // Based on logic: 
+              // 1. Cancelled on the way = No refund (Platform keeps total 200)
+              // 2. Cancelled at estimate = ₹50 platform share (requested)
+              share = req.estimated_service_cost ? 50 : 200;
+            }
+          }
+
+          return {
+            date: req.status === 'completed' ? req.completed_at : req.updatedAt,
+            type: req.used_free_visit ? `Free Visit (${req.status})` : label,
+            amount: (req.status === 'cancelled' && !req.visit_fee_paid) ? 0 : 200,
+            platform_share: share,
+            user: req.user_id?.name || 'Unknown'
+          };
+        })
+      ].filter(item => item.platform_share > 0)
+        .sort((a, b) => new Date(b.date) - new Date(a.date));
 
       return res.json(revenueData);
     }
