@@ -13,4 +13,10 @@ router.post(
   paymentController.payVisitFee
 );
 
+router.post(
+  '/verify-visit-fee',
+  authMiddleware('user'),
+  paymentController.verifyVisitFee
+);
+
 module.exports = router;

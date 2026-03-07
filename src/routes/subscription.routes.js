@@ -22,4 +22,10 @@ router.get(
   subscriptionController.getMySubscription
 );
 
+router.post(
+  '/verify',
+  authMiddleware('user'),
+  subscriptionController.verifySubscription
+);
+
 module.exports = router;
