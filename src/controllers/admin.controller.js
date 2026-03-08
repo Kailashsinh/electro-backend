@@ -173,7 +173,8 @@ exports.getReportData = async (req, res) => {
           type: 'Subscription',
           amount: s.amount,
           platform_share: s.amount,
-          user: s.user_id?.name || 'Unknown'
+          user: s.user_id?.name || 'Unknown',
+          status: 'success'
         })),
         ...requests.map(req => {
           let share = 0;
@@ -196,7 +197,8 @@ exports.getReportData = async (req, res) => {
             type: req.used_free_visit ? `Free Visit (${req.status})` : label,
             amount: (req.status === 'cancelled' && !req.visit_fee_paid) ? 0 : 200,
             platform_share: share,
-            user: req.user_id?.name || 'Unknown'
+            user: req.user_id?.name || 'Unknown',
+            status: 'success'
           };
         })
       ].filter(item => item.platform_share > 0)
@@ -327,12 +329,12 @@ exports.getTechnicianPayouts = async (req, res) => {
         is_verified: details.is_verified,
         bank: details.method === 'bank' ? {
           bank_name: details.bank.bank_name,
-          account_number: decrypt(details.bank.account_number),
-          ifsc_code: decrypt(details.bank.ifsc_code),
-          account_holder: decrypt(details.bank.account_holder)
+          account_number: decrypt(details.bank.account_number) || details.bank.account_number,
+          ifsc_code: decrypt(details.bank.ifsc_code) || details.bank.ifsc_code,
+          account_holder: decrypt(details.bank.account_holder) || details.bank.account_holder
         } : null,
         upi: details.method === 'upi' ? {
-          upi_id: decrypt(details.upi.upi_id)
+          upi_id: decrypt(details.upi.upi_id) || details.upi.upi_id
         } : null
       };
       return formatted;

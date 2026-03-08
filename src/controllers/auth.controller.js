@@ -182,7 +182,17 @@ exports.loginUser = async (req, res) => {
     }
 
     const token = generateToken(user._id, 'user');
-    res.json({ token, user });
+    const subscription = await Subscription.findOne({
+      user_id: user._id,
+      status: 'active',
+    }).sort({ end_date: -1 });
+
+    const userObj = user.toObject();
+    if (subscription) {
+      userObj.subscription = subscription;
+    }
+
+    res.json({ token, user: userObj });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

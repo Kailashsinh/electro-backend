@@ -200,7 +200,7 @@ exports.verifyVisitFee = async (req, res) => {
       user_id: req.user.id,
       amount: 200,
       type: 'debit',
-      category: 'visit_fee',
+      category: 'visit_fee_payment',
       description: 'Paid visit fee for service request',
       status: 'success',
       payment_method: 'razorpay',
